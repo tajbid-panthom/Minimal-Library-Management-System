@@ -17,7 +17,7 @@ const bookSchemaValidation = z.object({
   ]),
   isbn: z.string(),
   description: z.string().optional(),
-  copies: z.number().min(0),
+  copies: z.preprocess((val) => Number(val), z.number().min(0)),
   available: z.boolean().default(true),
 });
 // 1.book created route
@@ -41,32 +41,53 @@ bookRoute.post("/", async (req: Request, res: Response) => {
 // 2. get all books route
 bookRoute.get("/", async (req: Request, res: Response) => {
   try {
-    const { filter, sortBy: rawSortBy, sort: rawSort, limit } = req.query;
+    const {
+      filter,
+      sortBy: rawSortBy,
+      sort: rawSort,
+      limit: rawLimit,
+      skip: rawSkip,
+    } = req.query;
 
     const sortBy = (rawSortBy as string) || "createdAt";
     const sort = rawSort === "desc" ? -1 : 1;
+    const limit = parseInt(rawLimit as string) || 10;
+    const skip = parseInt(rawSkip as string) || 0;
 
-    const data = await Book.find({ genre: filter })
-      .sort({ [sortBy]: sort })
-      .limit(parseInt(limit as string) || 10);
-    if (!data) {
-      throw new Error("Book not found");
+    const query: any = {};
+    if (filter) {
+      query.genre = filter;
     }
+
+    const [data, total] = await Promise.all([
+      Book.find(query)
+        .sort({ [sortBy]: sort })
+        .skip(skip)
+        .limit(limit),
+      Book.countDocuments(query),
+    ]);
+
     res.status(200).json({
       success: true,
       message: "Books retrieved successfully",
       data,
+      meta: {
+        total,
+        page: Math.floor(skip / limit) + 1,
+        limit,
+      },
     });
   } catch (error) {
     res.status(400).json({
-      message: "Books retrieved Failed",
       success: false,
+      message: "Books retrieval failed",
       error: {
         message: (error as Error).message,
       },
     });
   }
 });
+
 // 3. get single book route
 bookRoute.get("/:bookId", async (req: Request, res: Response) => {
   try {

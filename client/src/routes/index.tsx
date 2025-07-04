@@ -17,7 +17,7 @@ export const router = createBrowserRouter([
         Component: AddBooks,
       },
       {
-        path: "/book-summary",
+        path: "/borrow-summary",
         Component: BookSummary,
       },
     ],
